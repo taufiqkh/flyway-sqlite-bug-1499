@@ -16,6 +16,7 @@ import org.flywaydb.core.Flyway;
  */
 public class ExampleFlyway {
     private static final String DB_NAME = "test-v1.db";
+    private static final String DB_WORKAROUND_NAME = "test2-v1.db";
     private static final String SQL_NAME = "V2__test.sql";
 
     public static void main(String[] args) throws URISyntaxException, IOException {
@@ -39,7 +40,13 @@ public class ExampleFlyway {
         ).toPath();
         Files.copy(migrationResource, migrationTarget);
 
+        // The following uses a workaround - a wrapper around the
+        // SQLiteDataSource that only has a single connection that it returns
+//        Files.copy(dbResource, new File(DB_WORKAROUND_NAME).toPath());
+//        attemptWorkaroundMigration();
+
         attemptMigration();
+
     }
 
     private static void attemptMigration() {
@@ -50,6 +57,18 @@ public class ExampleFlyway {
         dataSource.setUrl("jdbc:sqlite:" + DB_NAME);
         Flyway flyway = new Flyway();
         flyway.setDataSource(dataSource);
+        flyway.setLocations("filesystem:migrations");
+        flyway.migrate();
+    }
+
+    private static void attemptWorkaroundMigration() {
+        SQLiteConfig config = new SQLiteConfig();
+        config.setJournalMode(SQLiteConfig.JournalMode.WAL);
+        config.setSynchronous(SQLiteConfig.SynchronousMode.NORMAL);
+        SQLiteDataSource dataSource = new SQLiteDataSource(config);
+        dataSource.setUrl("jdbc:sqlite:" + DB_WORKAROUND_NAME);
+        Flyway flyway = new Flyway();
+        flyway.setDataSource(new WorkaroundDataSource(dataSource));
         flyway.setLocations("filesystem:migrations");
         flyway.migrate();
     }
